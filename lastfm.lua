@@ -1,24 +1,20 @@
--- last.fm scrobbler for mpv
---
--- Usage:
--- put this file in ~/.config/mpv/scripts
--- put https://github.com/hauzer/scrobbler somewhere in your PATH
--- run `scrobbler add-user` and follow the instructions
--- create a file ~/.mpv/script-opts/lastfm.conf with the following content:
--- username=<your last.fm user name>
-
 local msg = require 'mp.msg'
 require 'mp.options'
-
-local options = {
-	username = "change username in script-opts/lastfm.conf"
-}
+local prev_song_args = ''
+local options = {username = ''}
+local accepted_file_formats = {'flac', 'mp3'}
 read_options(options, 'lastfm')
 
-local prev_song_args = ''
+function has_value (tab, val)
+	for index, value in ipairs(tab) do
+		if value == val then
+			return true
+		end
+	end
+	return false
+end
 
 function mkmetatable()
-	msg.info(string.format("Inside mkmetatable()"))
 	local m = {}
 	for i = 0, mp.get_property("metadata/list/count") - 1 do
 		local p = "metadata/list/"..i.."/"
@@ -32,38 +28,26 @@ function esc(s)
 end
 
 function scrobble()
-	msg.info(string.format("Inside scrobble"))
 	mp.resume_all()
-	-- Parameter escaping function. Works with POSIX shells; idk if there's a better way to call stuff portably in Lua.
-
 	if artist and title then
-		--msg.info(string.format("Scrobbling %s - %s", artist, title))
-
-		optargs = ''
-		if album then
-			optargs = string.format("%s '--album=%s'", optargs, esc(album))
-		end
-		if length then
-			optargs = string.format("%s '--duration=%ds'", optargs, length)
-		end
 		args = string.format("scrobbler scrobble %s '%s' '%s' now -a '%s' -d %ds > /dev/null", esc(options.username), esc(artist), esc(title), esc(album), length)
 		prev_song_args = args
-		-- msg.verbose(args)
-		--os.execute(args)
 	end
 end
 
 function enqueue()
-	msg.info(string.format("Inside enqueue"))
 	mp.resume_all()
 	if artist and title then
+		if options.username == '' then
+			msg.info(string.format("Could not find a username! Please follow the steps in the README.md"))
+			return
+		end
 		args = string.format("scrobbler now-playing %s '%s' '%s' -a '%s' -d %ds > /dev/null", esc(options.username), esc(artist), esc(title), esc(album), length)
-		msg.info(args)
 		msg.verbose(args)
 		os.execute(args)
 		if tim then tim.kill(tim) end
 		if length then
-			timeout = 10 
+			timeout = length / 2 
 		else
 			timeout = 240
 		end
@@ -72,7 +56,6 @@ function enqueue()
 end
 
 function new_track()
-	msg.info(string.format("Inside new_track"))
 	if mp.get_property("metadata/list/count") then
 		local m = mkmetatable()
 		local icy = m["icy-title"]
@@ -101,31 +84,26 @@ function new_track()
 	end
 end
 
-function on_restart()
-	msg.info(string.format("Inside on_restart()"))
+function on_close()
 	if not prev_song_args or prev_song_args ~= '' then
-		msg.info(string.format("Scrobbling yeehaaw"))
 		msg.verbose(prev_song_args)
 		os.execute(prev_song_args)
 		prev_song_args = ''
 	end
+end
+
+function on_file_loaded()
 	audio_pts = mp.get_property("audio-pts")
+	file_format = mp.get_property("file-format")
+	if not has_value(accepted_file_formats, file_format) then
+		msg.info(string.format("The file format %s is not accepted. If you think this is a mistake, you can add the file format to the accepted file format list.", string.format(file_format)))
+		return
+	end
 	-- FIXME a better check for -loop'ing tracks
-	if ((not audio_pts) or (tonumber(audio_pts) < 1)) then
+	if (not audio_pts) or (tonumber(audio_pts) < 1) then
 		new_track()
 	end
 end
 
-function on_close()
-	msg.info(string.format("Insde on_close()"))
-	if not prev_song_args or prev_song_args ~= '' then
-		msg.info(string.format("Scrobbling on ending yeehaaw"))
-		msg.verbose(prev_song_args)
-		os.execute(prev_song_args)
-		prev_song_args = ''
-	end
-end
-
-mp.observe_property("metadata/list/count", nil, new_track)
-mp.register_event("playback-restart", on_restart)
 mp.register_event("end-file", on_close)
+mp.register_event("file-loaded", on_file_loaded)
