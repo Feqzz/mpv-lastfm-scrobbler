@@ -93,7 +93,6 @@ function on_close()
 end
 
 function on_file_loaded()
-	audio_pts = mp.get_property("audio-pts")
 	file_format = mp.get_property("file-format")
 	if not has_value(accepted_file_formats, file_format) then
 		msg.info(string.format("The file format %s is not accepted. If you think this is a mistake, you can add the file format to the accepted file format list.", string.format(file_format)))
