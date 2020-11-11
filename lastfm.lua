@@ -99,10 +99,7 @@ function on_file_loaded()
 		msg.info(string.format("The file format %s is not accepted. If you think this is a mistake, you can add the file format to the accepted file format list.", string.format(file_format)))
 		return
 	end
-	-- FIXME a better check for -loop'ing tracks
-	if (not audio_pts) or (tonumber(audio_pts) < 1) then
-		new_track()
-	end
+	new_track()
 end
 
 mp.register_event("end-file", on_close)
