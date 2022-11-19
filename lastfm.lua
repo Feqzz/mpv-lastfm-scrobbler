@@ -28,7 +28,6 @@ function esc(s)
 end
 
 function scrobble()
-	mp.resume_all()
 	if artist and title then
 		args = string.format("scrobbler scrobble %s '%s' '%s' now -a '%s' -d %ds > /dev/null", esc(options.username), esc(artist), esc(title), esc(album), length)
 		prev_song_args = args
@@ -36,7 +35,6 @@ function scrobble()
 end
 
 function enqueue()
-	mp.resume_all()
 	if artist and title then
 		if options.username == '' then
 			msg.info(string.format("Could not find a username! Please follow the steps in the README.md"))
